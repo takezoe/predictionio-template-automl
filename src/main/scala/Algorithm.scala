@@ -20,6 +20,8 @@ import org.apache.spark.sql.SparkSession
 
 case class AlgorithmParams(mult: Int) extends Params
 
+// TODO Implement batch method using Spark
+
 class Algorithm(val ap: AlgorithmParams)
   // extends PAlgorithm if Model contains RDD[]
   extends P2LAlgorithm[PreparedData, ScoreFunction, Query, PredictedResult] {
@@ -65,6 +67,21 @@ class Algorithm(val ap: AlgorithmParams)
   }
 
   def predict(model: ScoreFunction, query: Query): PredictedResult = {
-    model
+    val map = Map(
+      "id"       -> query.id,
+      "survived" -> query.survived,
+      "pClass"   -> query.pClass,
+      "name"     -> query.name,
+      "sex"      -> query.sex,
+      "age"      -> query.age,
+      "sibSp"    -> query.sibSp,
+      "parCh"    -> query.parCh,
+      "ticket"   -> query.ticket,
+      "fare"     -> query.fare,
+      "cabin"    -> query.cabin,
+      "embarked" -> query.embarked
+    )
+    val result = model(map)
+    PredictedResult(result("survived").toString)
   }
 }
