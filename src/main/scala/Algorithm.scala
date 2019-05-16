@@ -69,7 +69,7 @@ class Algorithm(val ap: AlgorithmParams)
   def predict(model: ScoreFunction, query: Query): PredictedResult = {
     val map = Map(
       "id"       -> query.id,
-      "survived" -> query.survived,
+      //"survived" -> query.survived,
       "pClass"   -> query.pClass,
       "name"     -> query.name,
       "sex"      -> query.sex,
@@ -82,6 +82,6 @@ class Algorithm(val ap: AlgorithmParams)
       "embarked" -> query.embarked
     )
     val result = model(map)
-    PredictedResult(result("survived").toString)
+    PredictedResult(result("survived").toString.toInt) // TODO cast
   }
 }

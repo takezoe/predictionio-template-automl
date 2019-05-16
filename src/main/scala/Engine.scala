@@ -5,7 +5,7 @@ import org.apache.predictionio.controller.Engine
 
 case class Query(
   id: Int,
-  survived: Int,
+  //survived: Int,
   pClass: Option[Int],
   name: Option[String],
   sex: Option[String],
@@ -18,7 +18,7 @@ case class Query(
   embarked: Option[String]
 ) extends Serializable
 
-case class PredictedResult(p: String) extends Serializable
+case class PredictedResult(survived: Int) extends Serializable
 
 object VanillaEngine extends EngineFactory {
   def apply() = {
