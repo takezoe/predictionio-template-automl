@@ -4,7 +4,7 @@
   "engineFactory": "org.example.vanilla.VanillaEngine",
   "datasource": {
     "params" : {
-      "appName": "INVALID_APP_NAME"
+      "appName": "MyAutoMLApp1"
     }
   },
   "algorithms": [

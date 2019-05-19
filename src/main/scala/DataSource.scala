@@ -23,30 +23,44 @@ class DataSource(val dsp: DataSourceParams)
   override
   def readTraining(sc: SparkContext): TrainingData = {
 
+    println("***** " + dsp.appName)
+
    val eventsRDD: RDD[Event] = PEventStore.find(
       appName = dsp.appName,
-      entityType = Some("ENTITY_TYPE"),
-      eventNames = Some(List("EVENT")),
-      targetEntityType = Some(Some("TARGET_ENTITY_TYPE")))(sc)
+      entityType = Some("passenger"),
+      eventNames = Some(List("titanic")))(sc)
 
    val passengersRDD = eventsRDD.map { event =>
+     println(event.properties)
       Passenger(
-        event.properties.get("id"),
-        event.properties.get("survived"),
-        event.properties.get("pClass"),
-        event.properties.get("name"),
-        event.properties.get("sex"),
-        event.properties.get("age"),
-        event.properties.get("sibSp"),
-        event.properties.get("parCh"),
-        event.properties.get("ticket"),
-        event.properties.get("fare"),
-        event.properties.get("cabin"),
-        event.properties.get("embarked")
+        event.entityId.toInt,
+        event.properties.get[String]("survived").toInt,
+        toOption(event.properties.get[String]("pClass")).map(_.toInt),
+        toOption(event.properties.get[String]("name")),
+        toOption(event.properties.get[String]("sex")),
+        toOption(event.properties.get[String]("age")).map(_.toDouble),
+        toOption(event.properties.get[String]("sibSp")).map(_.toInt),
+        toOption(event.properties.get[String]("parCh")).map(_.toInt),
+        toOption(event.properties.get[String]("ticket")),
+        toOption(event.properties.get[String]("fare")).map(_.toDouble),
+        toOption(event.properties.get[String]("cabin")),
+        toOption(event.properties.get[String]("embarked"))
       )
     }
 
     new TrainingData(passengersRDD)
+  }
+
+//  private def toInt(s: String): Option[Int] = {
+//    if(s.isEmpty) None else Some(s.toInt)
+//  }
+//
+//  private def toDouble(s: String): Option[Double] = {
+//    if(s.isEmpty) None else Some(s.toDouble)
+//  }
+
+  private def toOption(s: String): Option[String] = {
+    if(s.isEmpty) None else Some(s)
   }
 }
 
