@@ -1,5 +1,9 @@
 # Skeleton Engine Template
 
+```
+$ curl -H "Content-Type: application/json" -d '{ "pClass": "3", "name": "Glynn, Miss. Mary Agatha", "sex": "female", "age": 66, "sibSp": 1, "parCh": 0, "ticket": "C.A", "fare", 1.25, "cabin": "", "embarked": "S" }' http://localhost:8000/queries.json -s | jq .
+```
+
 ## Documentation
 
 Please refer to https://predictionio.apache.org/templates/vanilla/quickstart/

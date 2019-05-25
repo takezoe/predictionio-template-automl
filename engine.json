@@ -11,7 +11,53 @@
     {
       "name": "algo",
       "params": {
-        "mult" : 1
+        "target" : "survived",
+        "schema" : [
+          {
+            "field": "survived",
+            "type": "double"
+          },
+          {
+            "field": "pClass",
+            "type": "string"
+          },
+          {
+            "field": "name",
+            "type": "string"
+          },
+          {
+            "field": "sex",
+            "type": "string"
+          },
+          {
+            "field": "age",
+            "type": "double"
+          },
+          {
+            "field": "sibSp",
+            "type": "int"
+          },
+          {
+            "field": "parCh",
+            "type": "int"
+          },
+          {
+            "field": "ticket",
+            "type": "string"
+          },
+          {
+            "field": "fare",
+            "type": "double"
+          },
+          {
+            "field": "cabin",
+            "type": "string"
+          },
+          {
+            "field": "embarked",
+            "type": "string"
+          }
+        ]
       }
     }
   ]
