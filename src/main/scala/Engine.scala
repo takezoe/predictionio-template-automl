@@ -4,8 +4,6 @@ import org.apache.predictionio.controller.EngineFactory
 import org.apache.predictionio.controller.Engine
 
 case class Query(
-  id: Int,
-  //survived: Int,
   pClass: Option[Int],
   name: Option[String],
   sex: Option[String],

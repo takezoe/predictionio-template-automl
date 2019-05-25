@@ -4,20 +4,17 @@ import com.salesforce.op.{OpWorkflow, OpWorkflowModel}
 import org.apache.predictionio.controller.{EmptyParams, P2LAlgorithm, PersistentModel, PersistentModelLoader}
 import org.apache.spark.SparkContext
 import grizzled.slf4j.Logger
-import org.slf4j.LoggerFactory
 import com.salesforce.op.features.FeatureBuilder
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
-import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsToTry._
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
 import com.salesforce.op.local._
 import org.apache.spark.sql.SparkSession
+import Features._
 
 // TODO Implement batch method using Spark
 
 class Algorithm(val ap: EmptyParams)
   extends P2LAlgorithm[PreparedData, Model, Query, PredictedResult] {
-
-  import Model._
 
   @transient lazy val logger = Logger[this.type]
 
@@ -29,6 +26,9 @@ class Algorithm(val ap: EmptyParams)
 
     val spark = SparkSession.builder.config(sc.getConf).getOrCreate()
     val fittedWorkflow = workflow.train()(spark)
+
+    val score = fittedWorkflow.score()(spark)
+    score.withColumnRenamed("column_name", "prediction")
 
     new Model(fittedWorkflow, fittedWorkflow.scoreFunction(spark))
 
@@ -66,21 +66,24 @@ class Algorithm(val ap: EmptyParams)
 
   def predict(model: Model, query: Query): PredictedResult = {
     val map = Map(
-      "survived" -> -1,
-      "pClass"   -> query.pClass,
-      "name"     -> query.name,
-      "sex"      -> query.sex,
-      "age"      -> query.age,
-      "sibSp"    -> query.sibSp,
-      "parCh"    -> query.parCh,
-      "ticket"   -> query.ticket,
-      "fare"     -> query.fare,
-      "cabin"    -> query.cabin,
-      "embarked" -> query.embarked
+      "survived" -> 1,
+      "pClass"   -> query.pClass.getOrElse(""),
+      "name"     -> query.name.getOrElse(""),
+      "sex"      -> query.sex.getOrElse(""),
+      "age"      -> query.age.getOrElse(0),
+      "sibSp"    -> query.sibSp.getOrElse(0),
+      "parCh"    -> query.parCh.getOrElse(0),
+      "ticket"   -> query.ticket.getOrElse(""),
+      "fare"     -> query.fare.getOrElse(0),
+      "cabin"    -> query.cabin.getOrElse(""),
+      "embarked" -> query.embarked.getOrElse("")
     )
-    PredictedResult(0)
+    println("***************")
+    println(map)
+    println("***************")
     val result = model.scoreFunction(map)
-    PredictedResult(result("survived").toString.toInt)
+
+    PredictedResult(result(prediction.name).asInstanceOf[Map[String, Any]]("prediction").asInstanceOf[Double].toInt)
   }
 }
 
@@ -97,7 +100,7 @@ class Model(val model: OpWorkflowModel, val scoreFunction: ScoreFunction) extend
 
 }
 
-object Model extends PersistentModelLoader[EmptyParams, Model] {
+object Features {
   val survived = FeatureBuilder.RealNN[Passenger].extract(_.survived.toRealNN).asResponse
   val pClass = FeatureBuilder.PickList[Passenger].extract(_.pClass.map(_.toString).toPickList).asPredictor
   val name = FeatureBuilder.Text[Passenger].extract(_.name.toText).asPredictor
@@ -115,14 +118,18 @@ object Model extends PersistentModelLoader[EmptyParams, Model] {
     cabin, embarked
   ).transmogrify()
 
-  val prediction =
-    BinaryClassificationModelSelector.withTrainValidationSplit(
-      modelTypesToUse = Seq(OpLogisticRegression)
-    ).setInput(survived, passengerFeatures).getOutput()
+  val prediction = new OpLogisticRegression().setInput(survived, passengerFeatures).getOutput
+//    BinaryClassificationModelSelector.withTrainValidationSplit(
+//      modelTypesToUse = Seq(OpLogisticRegression)
+//    ).setInput(survived, passengerFeatures).getOutput()
+}
+
+object Model extends PersistentModelLoader[EmptyParams, Model] {
 
   override def apply(id: String, params: EmptyParams, sc: Option[SparkContext]): Model = {
     try {
       val path = "/tmp/" + id + ".model"
+
       val workflow = new OpWorkflow()
         .setResultFeatures(survived, prediction)
         .loadModel(path)

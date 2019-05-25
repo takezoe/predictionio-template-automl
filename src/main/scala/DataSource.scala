@@ -23,19 +23,16 @@ class DataSource(val dsp: DataSourceParams)
   override
   def readTraining(sc: SparkContext): TrainingData = {
 
-    println("***** " + dsp.appName)
-
    val eventsRDD: RDD[Event] = PEventStore.find(
       appName = dsp.appName,
       entityType = Some("passenger"),
       eventNames = Some(List("titanic")))(sc)
 
    val passengersRDD = eventsRDD.map { event =>
-     println(event.properties)
       Passenger(
         event.entityId.toInt,
         event.properties.get[String]("survived").toInt,
-        toOption(event.properties.get[String]("pClass")).map(_.toInt),
+        toOption(event.properties.get[String]("pClass")).map(_.toString),
         toOption(event.properties.get[String]("name")),
         toOption(event.properties.get[String]("sex")),
         toOption(event.properties.get[String]("age")).map(_.toDouble),
@@ -50,14 +47,6 @@ class DataSource(val dsp: DataSourceParams)
 
     new TrainingData(passengersRDD)
   }
-
-//  private def toInt(s: String): Option[Int] = {
-//    if(s.isEmpty) None else Some(s.toInt)
-//  }
-//
-//  private def toDouble(s: String): Option[Double] = {
-//    if(s.isEmpty) None else Some(s.toDouble)
-//  }
 
   private def toOption(s: String): Option[String] = {
     if(s.isEmpty) None else Some(s)
@@ -75,7 +64,7 @@ class TrainingData(
 case class Passenger(
   id: Int,
   survived: Int,
-  pClass: Option[Int],
+  pClass: Option[String],
   name: Option[String],
   sex: Option[String],
   age: Option[Double],
