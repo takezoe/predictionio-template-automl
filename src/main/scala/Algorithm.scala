@@ -1,14 +1,20 @@
 package org.example.vanilla
 
+import com.salesforce.op.features.FeatureBuilder.fromRow
 import com.salesforce.op.{OpWorkflow, OpWorkflowModel}
 import org.apache.predictionio.controller.{P2LAlgorithm, Params, PersistentModel, PersistentModelLoader}
 import org.apache.spark.SparkContext
 import grizzled.slf4j.Logger
-import com.salesforce.op.features.FeatureBuilder
+import com.salesforce.op.features.{Feature, FeatureSparkTypes}
 import com.salesforce.op.features.types._
 import com.salesforce.op.local._
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
+import org.apache.predictionio.data.storage.Event
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StringType, StructField, StructType}
+
+import scala.language.experimental.macros
+import scala.reflect.runtime.universe._
 
 // TODO Implement batch method using Spark
 
@@ -17,15 +23,74 @@ case class AlgorithmParams(target: String, schema: Seq[Field]) extends Params {
     StructType(
       schema.map { field =>
         StructField(field.field, field.`type` match {
-          case "double" => DoubleType
           case "string" => StringType
+          case "double" => DoubleType
           case "int"    => IntegerType
-        })
+        }, field.nullable)
       }
     )
   }
+
+  def row(event: Event): Row = {
+    Row(
+      (schema.map { field =>
+        // TODO Better type conversion
+        val (value, default) = field.`type` match {
+          case "string" => (event.properties.getOpt[String](field.field), "")
+          case "double" => (event.properties.getOpt[String](field.field).filter(_.nonEmpty).map(_.toDouble), 0d)
+          case "int"    => (event.properties.getOpt[String](field.field).filter(_.nonEmpty).map(_.toInt), 0)
+        }
+        value match {
+          case Some(x) => x
+          case None    => if(field.nullable) null else default
+        }
+      }): _*
+    )
+  }
+
+  // TODO Should be implemented in TransmogrifAI
+  def features[ResponseType <: FeatureType : WeakTypeTag](
+    nonNullable: Set[String] = Set.empty
+  ): (Feature[ResponseType], Array[Feature[_ <: FeatureType]]) = {
+    val schema = structType
+    val allFeatures: Array[Feature[_ <: FeatureType]] =
+      schema.fields.zipWithIndex.map { case (field, index) =>
+        val isResponse = field.name == target
+        val isNullable = !isResponse && !nonNullable.contains(field.name)
+        val wtt: WeakTypeTag[_ <: FeatureType] = FeatureSparkTypes.featureTypeTagOf(field.dataType, isNullable)
+        val feature = fromRow(name = field.name, index = Some(index))(wtt)
+        if (isResponse) feature.asResponse else feature.asPredictor
+      }
+    val (responses, features) = allFeatures.partition(_.name == target)
+    val responseFeature = responses.toList match {
+      case feature :: Nil if feature.isSubtypeOf[ResponseType] =>
+        feature.asInstanceOf[Feature[ResponseType]]
+      case feature :: Nil =>
+        throw new RuntimeException(
+          s"Response feature '$target' is of type ${feature.typeName}, but expected ${FeatureType.typeName[ResponseType]}")
+      case Nil =>
+        throw new RuntimeException(s"Response feature '$target' was not found in dataframe schema")
+      case _ =>
+        throw new RuntimeException(s"Multiple features with name '$target' were found (should not happen): "
+          + responses.map(_.name).mkString(","))
+    }
+    responseFeature -> features
+  }
+
+  def query(map: Map[String, Any]): Map[String, Any] = {
+    map.map { case (key, value) =>
+      // TODO Better type conversion
+      val field = schema.find(_.field == key).get
+      key -> (field.`type` match {
+        case "string" => value.toString
+        case "double" => value.toString.toDouble
+        case "int"    => value.toString.toInt
+      })
+    } + (target -> 0d)
+  }
 }
-case class Field(field: String, `type`: String)
+
+case class Field(field: String, `type`: String, nullable: Boolean)
 
 class Algorithm(val params: AlgorithmParams)
   extends P2LAlgorithm[PreparedData, Model, Map[String, Any], PredictedResult] {
@@ -36,60 +101,40 @@ class Algorithm(val params: AlgorithmParams)
 
     val spark = SparkSession.builder.config(sc.getConf).getOrCreate()
 
-    val df = spark.createDataFrame(data.events.map { event =>
-      Row(
-        event.properties.get[String]("survived").toDouble,
-        toOption(event.properties.get[String]("pClass")).map(_.toString).getOrElse(""),
-        toOption(event.properties.get[String]("name")).getOrElse(""),
-        toOption(event.properties.get[String]("sex")).getOrElse(""),
-        toOption(event.properties.get[String]("age")).map(_.toDouble).getOrElse(0d),
-        toOption(event.properties.get[String]("sibSp")).map(_.toInt).getOrElse(0),
-        toOption(event.properties.get[String]("parCh")).map(_.toInt).getOrElse(0),
-        toOption(event.properties.get[String]("ticket")).getOrElse(""),
-        toOption(event.properties.get[String]("fare")).map(_.toDouble).getOrElse(0d),
-        toOption(event.properties.get[String]("cabin")).getOrElse(""),
-        toOption(event.properties.get[String]("embarked")).getOrElse("")
-      )
-    }, params.structType)
+    val df = spark.createDataFrame(data.events.map { event => params.row(event) }, params.structType)
 
-    val (target, features) = FeatureBuilder.fromDataFrame[RealNN](df, params.target)
+    val (target, features) = params.features[RealNN]()
     val featureVector = features.toSeq.autoTransform()
-    val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
+    //val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
+    val prediction = new OpLogisticRegression().setInput(target, featureVector).getOutput()
 
     val workflow =
       new OpWorkflow()
-        .setResultFeatures(target, checkedFeatures)
+        .setResultFeatures(prediction)
         .setInputDataset(df)
 
     val fittedWorkflow = workflow.train()(spark)
 
+    println("******")
+    println(fittedWorkflow.summaryPretty())
+    println("******")
+
     new Model(fittedWorkflow, fittedWorkflow.scoreFunction(spark))
   }
 
-  private def toOption(s: String): Option[String] = {
-    if(s.isEmpty) None else Some(s)
-  }
-
   def predict(model: Model, query: Map[String, Any]): PredictedResult = {
-//    val map = Map(
-//      "survived" -> 0,
-//      "pClass"   -> query.pClass.getOrElse(""),
-//      "name"     -> query.name.getOrElse(""),
-//      "sex"      -> query.sex.getOrElse(""),
-//      "age"      -> query.age.getOrElse(0),
-//      "sibSp"    -> query.sibSp.getOrElse(0),
-//      "parCh"    -> query.parCh.getOrElse(0),
-//      "ticket"   -> query.ticket.getOrElse(""),
-//      "fare"     -> query.fare.getOrElse(0),
-//      "cabin"    -> query.cabin.getOrElse(""),
-//      "embarked" -> query.embarked.getOrElse("")
-//    )
-    println("***************")
-    println(query)
-    println("***************")
-//    val result = model.scoreFunction(map)
-//    PredictedResult(result(prediction.name).asInstanceOf[Map[String, Any]]("prediction").asInstanceOf[Double].toInt)
-    PredictedResult(0)
+    val (target, features) = params.features[RealNN]()
+    val featureVector = features.toSeq.autoTransform()
+    //val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
+    val prediction = new OpLogisticRegression().setInput(target, featureVector).getOutput()
+
+    val result = model.scoreFunction(params.query(query))
+
+    println("******")
+    println(result)
+    println("******")
+
+    PredictedResult(result(prediction.name).asInstanceOf[Map[String, Any]]("prediction").asInstanceOf[Double].toInt)
   }
 }
 
@@ -114,13 +159,13 @@ object Model extends PersistentModelLoader[AlgorithmParams, Model] {
 
       val spark = SparkSession.builder.config(sc.get.getConf).getOrCreate()
 
-      val df = spark.createDataFrame(sc.get.emptyRDD[Row], params.structType)
-      val (target, features) = FeatureBuilder.fromDataFrame[RealNN](df, params.target)
+      val (target, features) = params.features[RealNN]()
       val featureVector = features.toSeq.autoTransform()
-      val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
+      //val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
+      val prediction = new OpLogisticRegression().setInput(target, featureVector).getOutput()
 
       val workflow = new OpWorkflow()
-        .setResultFeatures(target, checkedFeatures)
+        .setResultFeatures(prediction)
         .loadModel(path)
 
       new Model(workflow, workflow.scoreFunction(spark))

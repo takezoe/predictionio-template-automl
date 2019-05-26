@@ -15,47 +15,58 @@
         "schema" : [
           {
             "field": "survived",
-            "type": "double"
+            "type": "double",
+            "nullable": false
           },
           {
             "field": "pClass",
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           {
             "field": "name",
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           {
             "field": "sex",
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           {
             "field": "age",
-            "type": "double"
+            "type": "double",
+            "nullable": true
           },
           {
             "field": "sibSp",
-            "type": "int"
+            "type": "int",
+            "nullable": true
           },
           {
             "field": "parCh",
-            "type": "int"
+            "type": "int",
+            "nullable": true
           },
           {
             "field": "ticket",
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           {
             "field": "fare",
-            "type": "double"
+            "type": "double",
+            "nullable": true
           },
           {
             "field": "cabin",
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           {
             "field": "embarked",
-            "type": "string"
+            "type": "string",
+            "nullable": true
           }
         ]
       }
