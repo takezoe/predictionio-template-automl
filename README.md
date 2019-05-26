@@ -8,31 +8,31 @@ You can launch a prediction WebAPI service without any coding.
 
 Run the event server.
 
-```
+```bash
 $ pio eventserver &
 ```
 
 Import data to the event server.
 
-```
+```bash
 $ ./data/import_titanic.py ./data/titanic.csv
 ```
 
 Train the model.
 
-```
+```bash
 $ pio train
 ```
 
 Deploy the model as Web API.
 
-```
+```bash
 $ pio deploy
 ```
 
 Test the Web API.
 
-```
+```bash
 $ curl -H "Content-Type: application/json" -d '{ "pClass": "3", "name": "Glynn, Miss. Mary Agatha", "sex": "female", "age": 66, "sibSp": 1, "parCh": 0, "ticket": "C.A", "fare", 1.25, "cabin": "", "embarked": "S" }' http://localhost:8000/queries.json -s | jq .
 {
   "survived": 1
