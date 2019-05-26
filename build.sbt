@@ -1,6 +1,7 @@
-name := "template-transmogrifai"
+name := "template-scala-automl"
 
 scalaVersion := "2.11.12"
+
 libraryDependencies ++= Seq(
   "org.apache.predictionio" %% "apache-predictionio-core" % "0.14.0" % "provided",
   "org.apache.spark"        %% "spark-mllib"              % "2.4.0" % "provided",
@@ -19,13 +20,7 @@ libraryDependencies ++= Seq(
 parallelExecution in Test := false
 
 assemblyMergeStrategy in assembly := {
-  case "META-INF/MANIFEST.MF"                                => MergeStrategy.discard
-  case "reference.conf"                                => MergeStrategy.concat
-  case _ => MergeStrategy.first
-//  case PathList("javax", "servlet", xs @ _*)         => MergeStrategy.first
-//  case PathList(ps @ _*) if ps.last endsWith ".html" => MergeStrategy.first
-//  case "application.conf"                            => MergeStrategy.concat
-//  case x =>
-//    val oldStrategy = (assemblyMergeStrategy in assembly).value
-//    oldStrategy(x)
+  case "META-INF/MANIFEST.MF" => MergeStrategy.discard
+  case "reference.conf"       => MergeStrategy.concat
+  case _                      => MergeStrategy.first
 }
