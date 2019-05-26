@@ -1,5 +1,7 @@
 package org.example.vanilla
 
+import java.io.File
+
 import com.salesforce.op.features.FeatureBuilder.fromRow
 import com.salesforce.op.{OpWorkflow, OpWorkflowModel}
 import org.apache.predictionio.controller.{P2LAlgorithm, Params, PersistentModel, PersistentModelLoader}
@@ -9,6 +11,7 @@ import com.salesforce.op.features.{Feature, FeatureSparkTypes}
 import com.salesforce.op.features.types._
 import com.salesforce.op.local._
 import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
+import org.apache.commons.io.FileUtils
 import org.apache.predictionio.data.storage.Event
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StringType, StructField, StructType}
@@ -105,8 +108,8 @@ class Algorithm(val params: AlgorithmParams)
 
     val (target, features) = params.features[RealNN]()
     val featureVector = features.toSeq.autoTransform()
-    //val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
-    val prediction = new OpLogisticRegression().setInput(target, featureVector).getOutput()
+    val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
+    val prediction = BinaryClassificationModelSelector().setInput(target, checkedFeatures).getOutput()
 
     val workflow =
       new OpWorkflow()
@@ -115,36 +118,29 @@ class Algorithm(val params: AlgorithmParams)
 
     val fittedWorkflow = workflow.train()(spark)
 
-    println("******")
-    println(fittedWorkflow.summaryPretty())
-    println("******")
+    logger.info(fittedWorkflow.summaryPretty())
 
-    new Model(fittedWorkflow, fittedWorkflow.scoreFunction(spark))
+    new Model(prediction.name, fittedWorkflow, fittedWorkflow.scoreFunction(spark))
   }
 
   def predict(model: Model, query: Map[String, Any]): PredictedResult = {
-    val (target, features) = params.features[RealNN]()
-    val featureVector = features.toSeq.autoTransform()
-    //val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
-    val prediction = new OpLogisticRegression().setInput(target, featureVector).getOutput()
+    logger.debug("query: " + query)
 
     val result = model.scoreFunction(params.query(query))
+    logger.debug("result: " + result)
 
-    println("******")
-    println(result)
-    println("******")
-
-    PredictedResult(result(prediction.name).asInstanceOf[Map[String, Any]]("prediction").asInstanceOf[Double].toInt)
+    PredictedResult(result(model.predictionName).asInstanceOf[Map[String, Any]]("prediction").asInstanceOf[Double].toInt)
   }
 }
 
-class Model(val model: OpWorkflowModel, val scoreFunction: ScoreFunction) extends PersistentModel[AlgorithmParams] {
+class Model(val predictionName: String, val model: OpWorkflowModel, val scoreFunction: ScoreFunction) extends PersistentModel[AlgorithmParams] {
 
   private lazy val logger = Logger[this.type]
 
   override def save(id: String, params: AlgorithmParams, sc: SparkContext): Boolean = {
     val path = "/tmp/" + id + ".model"
     model.save(path, true)
+    FileUtils.writeStringToFile(new File(path + "/name"), predictionName, "UTF-8")
     logger.info(s"Saved model to $path")
     true
   }
@@ -161,14 +157,16 @@ object Model extends PersistentModelLoader[AlgorithmParams, Model] {
 
       val (target, features) = params.features[RealNN]()
       val featureVector = features.toSeq.autoTransform()
-      //val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
-      val prediction = new OpLogisticRegression().setInput(target, featureVector).getOutput()
+      val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
+      val prediction = BinaryClassificationModelSelector().setInput(target, checkedFeatures).getOutput()
 
       val workflow = new OpWorkflow()
         .setResultFeatures(prediction)
         .loadModel(path)
 
-      new Model(workflow, workflow.scoreFunction(spark))
+      val predictionName = FileUtils.readFileToString(new File(path + "/name"), "UTF-8")
+
+      new Model(predictionName, workflow, workflow.scoreFunction(spark))
     } catch {
       case e: Exception =>
         e.printStackTrace()
