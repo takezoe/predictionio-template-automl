@@ -18,13 +18,13 @@ Import data to the event server.
 $ ./data/import_titanic.py ./data/titanic.csv
 ```
 
-Train the model.
+Train a model.
 
 ```bash
 $ pio train
 ```
 
-Deploy the model as Web API.
+Deploy the trained model as Web API.
 
 ```bash
 $ pio deploy
