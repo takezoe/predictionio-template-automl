@@ -27,7 +27,7 @@ $ pio train
 Deploy the model as Web API.
 
 ```
-$ pio train
+$ pio deploy
 ```
 
 Test the Web API.
