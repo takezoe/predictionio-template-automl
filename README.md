@@ -61,7 +61,7 @@ $ curl -H "Content-Type: application/json" -d '{ "pClass": "2", "name": "Nicola-
 
 ## Customize
 
-You only need to modify algorithm parameters in `engine.json` to customize this template.
+You only need to modify algorithm parameters in `engine.json` to customize this template. Note that target field type must be `double` for now.
 
 ```json
 "algorithms": [
