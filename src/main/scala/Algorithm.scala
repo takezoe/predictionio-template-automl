@@ -104,44 +104,29 @@ class Algorithm(val params: AlgorithmParams)
     val df = spark.createDataFrame(data.events.map { event => params.row(event) }, params.structType)
     val targetCount = df.map(row => row.get(row.fieldIndex(params.target)).asInstanceOf[Double]).distinct.count()
 
-    if (targetCount == 2) {
-      val (target, features) = params.features[RealNN]()
-      val featureVector = features.toSeq.autoTransform()
-      val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
-      val prediction = BinaryClassificationModelSelector().setInput(target, checkedFeatures).getOutput()
+    val (target, features) = params.features[RealNN]()
+    val featureVector = features.toSeq.autoTransform()
+    val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
 
-      val workflow = new OpWorkflow().setResultFeatures(prediction).setInputDataset(df)
-      val fittedWorkflow = workflow.train()(spark)
-
-      logger.info(fittedWorkflow.summaryPretty())
-
-      new Model(prediction.name, fittedWorkflow, fittedWorkflow.scoreFunction(spark))
+    val prediction = if (targetCount == 2) {
+      logger.info("Use BinaryClassificationModelSelector")
+      BinaryClassificationModelSelector().setInput(target, checkedFeatures).getOutput()
 
 //    } else if(targetCount > 2 && targetCount < 30 && targetType == "string") {
-//      val (target, features) = params.features[Text]()
-//      val featureVector = features.toSeq.autoTransform()
+//      logger.info("Use MultiClassificationModelSelector")
 //      val prediction = MultiClassificationModelSelector().setInput(target.indexed(), featureVector).getOutput()
-//
-//      val workflow = new OpWorkflow().setResultFeatures(prediction).setInputDataset(df)
-//      val fittedWorkflow = workflow.train()(spark)
-//
-//      logger.info(fittedWorkflow.summaryPretty())
-//
-//      new Model(prediction.name, fittedWorkflow, fittedWorkflow.scoreFunction(spark))
 
     } else {
-      val (target, features) = params.features[RealNN]()
-      val featureVector = features.toSeq.autoTransform()
-      val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
-      val prediction = RegressionModelSelector().setInput(target, checkedFeatures).getOutput()
-
-      val workflow = new OpWorkflow().setResultFeatures(prediction).setInputDataset(df)
-      val fittedWorkflow = workflow.train()(spark)
-
-      logger.info(fittedWorkflow.summaryPretty())
-
-      new Model(prediction.name, fittedWorkflow, fittedWorkflow.scoreFunction(spark))
+      logger.info("Use RegressionModelSelector")
+      RegressionModelSelector().setInput(target, checkedFeatures).getOutput()
     }
+
+    val workflow = new OpWorkflow().setResultFeatures(prediction).setInputDataset(df)
+    val fittedWorkflow = workflow.train()(spark)
+
+    logger.info(fittedWorkflow.summaryPretty())
+
+    new Model(prediction.name, fittedWorkflow, fittedWorkflow.scoreFunction(spark))
   }
 
   override def batchPredictBase(sc: SparkContext, bm: Any, qs: RDD[(Long, Map[String, Any])]): RDD[(Long, PredictedResult)] = {
