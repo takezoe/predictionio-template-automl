@@ -1,4 +1,4 @@
-# AutoML Engine Template
+# PredictionIO AutoML Engine Template
 
 This is a [Apache PredictionIO](https://predictionio.apache.org/) engine template which offers AutoML capability using [TransmogrifAI](https://transmogrif.ai/).
 
