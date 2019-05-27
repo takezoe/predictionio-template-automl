@@ -124,6 +124,8 @@ class Algorithm(val params: AlgorithmParams)
     val model = bm.asInstanceOf[Model]
 
     val spark = SparkSession.builder.config(sc.getConf).getOrCreate()
+
+    // TODO Is this thread safe?
     model.model.setInputRDD(qs.map { case (_, query) => query })
     val result = model.model.score()(spark).rdd
 
