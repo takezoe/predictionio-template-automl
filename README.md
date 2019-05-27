@@ -4,6 +4,11 @@ This is a [Apache PredictionIO](https://predictionio.apache.org/) engine templat
 
 You can launch a prediction WebAPI service without any coding.
 
+## Prerequisites
+
+- Apache PredictionIO 0.14.0 or higher
+- Apache Spark 2.4.0 or higher
+
 ## Run Titanic example
 
 Create an application.
