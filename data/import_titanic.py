@@ -19,15 +19,15 @@ def import_events(client, file):
   header = next(reader)
   for row in reader:
     properties = {
-      "survived": row[1],
+      "survived": float(row[1]),
       "pClass": row[2],
       "name": row[3],
       "sex": row[4],
-      "age": row[5],
-      "sibSp": row[6],
-      "parCh": row[7],
+      "age": None if row[5] == '' else float(row[5]),
+      "sibSp": None if row[6] == '' else int(row[6]),
+      "parCh": None if row[7] == '' else int(row[7]),
       "ticket": row[8],
-      "fare": row[9],
+      "fare": None if row[9] == '' else float(row[9]),
       "cabin": row[10],
       "embarked": row[11]
     }

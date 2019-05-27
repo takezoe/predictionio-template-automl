@@ -10,7 +10,7 @@ import grizzled.slf4j.Logger
 import com.salesforce.op.features.{Feature, FeatureSparkTypes}
 import com.salesforce.op.features.types._
 import com.salesforce.op.local._
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector}
 import org.apache.commons.io.FileUtils
 import org.apache.predictionio.data.storage.Event
 import org.apache.spark.sql.{Row, SparkSession}
@@ -37,11 +37,10 @@ case class AlgorithmParams(target: String, schema: Seq[Field]) extends Params {
   def row(event: Event): Row = {
     Row(
       (schema.map { field =>
-        // TODO Better type conversion
         val (value, default) = field.`type` match {
           case "string" => (event.properties.getOpt[String](field.field), "")
-          case "double" => (event.properties.getOpt[String](field.field).filter(_.nonEmpty).map(_.toDouble), 0d)
-          case "int"    => (event.properties.getOpt[String](field.field).filter(_.nonEmpty).map(_.toInt), 0)
+          case "double" => (event.properties.getOpt[Double](field.field), 0d)
+          case "int"    => (event.properties.getOpt[Int](field.field), 0)
         }
         value match {
           case Some(x) => x
@@ -82,12 +81,9 @@ case class AlgorithmParams(target: String, schema: Seq[Field]) extends Params {
 
   def query(map: Map[String, Any]): Map[String, Any] = {
     map.map { case (key, value) =>
-      // TODO Better type conversion
-      val field = schema.find(_.field == key).get
-      key -> (field.`type` match {
-        case "string" => value.toString
-        case "double" => value.toString.toDouble
-        case "int"    => value.toString.toInt
+      key -> (value match {
+        case x: BigInt => x.toInt
+        case x         => x
       })
     } + (target -> 0d)
   }
