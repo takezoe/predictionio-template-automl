@@ -102,16 +102,9 @@ class Algorithm(val params: AlgorithmParams)
     import spark.implicits._
 
     val df = spark.createDataFrame(data.events.map { event => params.row(event) }, params.structType)
+    val targetCount = df.map(row => row.get(row.fieldIndex(params.target)).asInstanceOf[Double]).distinct.count()
 
-    val targetType = params.schema.find(_.field == params.target).get.`type`
-
-    val targetCount = (targetType match {
-      case "string" => df.map(row => row.get(row.fieldIndex(params.target)).asInstanceOf[String])
-      case "double" => df.map(row => row.get(row.fieldIndex(params.target)).asInstanceOf[Double])
-      //case "int"    => df.map(row => row.get(row.fieldIndex(params.target)).asInstanceOf[Int])
-    }).distinct.count()
-
-    if (targetCount == 2 && targetType == "double") {
+    if (targetCount == 2) {
       val (target, features) = params.features[RealNN]()
       val featureVector = features.toSeq.autoTransform()
       val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
@@ -124,17 +117,17 @@ class Algorithm(val params: AlgorithmParams)
 
       new Model(prediction.name, fittedWorkflow, fittedWorkflow.scoreFunction(spark))
 
-    } else if(targetCount > 2 && targetCount < 30 && targetType == "string") {
-      val (target, features) = params.features[Text]()
-      val featureVector = features.toSeq.autoTransform()
-      val prediction = MultiClassificationModelSelector().setInput(target.indexed(), featureVector).getOutput()
-
-      val workflow = new OpWorkflow().setResultFeatures(prediction).setInputDataset(df)
-      val fittedWorkflow = workflow.train()(spark)
-
-      logger.info(fittedWorkflow.summaryPretty())
-
-      new Model(prediction.name, fittedWorkflow, fittedWorkflow.scoreFunction(spark))
+//    } else if(targetCount > 2 && targetCount < 30 && targetType == "string") {
+//      val (target, features) = params.features[Text]()
+//      val featureVector = features.toSeq.autoTransform()
+//      val prediction = MultiClassificationModelSelector().setInput(target.indexed(), featureVector).getOutput()
+//
+//      val workflow = new OpWorkflow().setResultFeatures(prediction).setInputDataset(df)
+//      val fittedWorkflow = workflow.train()(spark)
+//
+//      logger.info(fittedWorkflow.summaryPretty())
+//
+//      new Model(prediction.name, fittedWorkflow, fittedWorkflow.scoreFunction(spark))
 
     } else {
       val (target, features) = params.features[RealNN]()
