@@ -10,7 +10,8 @@ import grizzled.slf4j.Logger
 import com.salesforce.op.features.{Feature, FeatureSparkTypes}
 import com.salesforce.op.features.types._
 import com.salesforce.op.local._
-import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, MultiClassificationModelSelector}
+import com.salesforce.op.stages.impl.regression.RegressionModelSelector
 import org.apache.commons.io.FileUtils
 import org.apache.predictionio.data.storage.Event
 import org.apache.spark.rdd.RDD
@@ -100,24 +101,56 @@ class Algorithm(val params: AlgorithmParams)
   override def train(sc: SparkContext, data: PreparedData): Model = {
 
     val spark = SparkSession.builder.config(sc.getConf).getOrCreate()
+    import spark.implicits._
 
     val df = spark.createDataFrame(data.events.map { event => params.row(event) }, params.structType)
 
-    val (target, features) = params.features[RealNN]()
-    val featureVector = features.toSeq.autoTransform()
-    val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
-    val prediction = BinaryClassificationModelSelector().setInput(target, checkedFeatures).getOutput()
+    val targetType = params.schema.find(_.field == params.target).get.`type`
 
-    val workflow =
-      new OpWorkflow()
-        .setResultFeatures(prediction)
-        .setInputDataset(df)
+    val targetCount = (targetType match {
+      case "string" => df.map(row => row.get(row.fieldIndex(params.target)).asInstanceOf[String])
+      case "double" => df.map(row => row.get(row.fieldIndex(params.target)).asInstanceOf[Double])
+      //case "int"    => df.map(row => row.get(row.fieldIndex(params.target)).asInstanceOf[Int])
+    }).distinct.count()
 
-    val fittedWorkflow = workflow.train()(spark)
+    if (targetCount == 2 && targetType == "double") {
+      val (target, features) = params.features[RealNN]()
+      val featureVector = features.toSeq.autoTransform()
+      val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
+      val prediction = BinaryClassificationModelSelector().setInput(target, checkedFeatures).getOutput()
 
-    logger.info(fittedWorkflow.summaryPretty())
+      val workflow = new OpWorkflow().setResultFeatures(prediction).setInputDataset(df)
+      val fittedWorkflow = workflow.train()(spark)
 
-    new Model(prediction.name, fittedWorkflow, fittedWorkflow.scoreFunction(spark))
+      logger.info(fittedWorkflow.summaryPretty())
+
+      new Model(prediction.name, fittedWorkflow, fittedWorkflow.scoreFunction(spark))
+
+    } else if(targetCount > 2 && targetCount < 30 && targetType == "string") {
+      val (target, features) = params.features[Text]()
+      val featureVector = features.toSeq.autoTransform()
+      val prediction = MultiClassificationModelSelector().setInput(target.indexed(), featureVector).getOutput()
+
+      val workflow = new OpWorkflow().setResultFeatures(prediction).setInputDataset(df)
+      val fittedWorkflow = workflow.train()(spark)
+
+      logger.info(fittedWorkflow.summaryPretty())
+
+      new Model(prediction.name, fittedWorkflow, fittedWorkflow.scoreFunction(spark))
+
+    } else {
+      val (target, features) = params.features[RealNN]()
+      val featureVector = features.toSeq.autoTransform()
+      val checkedFeatures = target.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
+      val prediction = RegressionModelSelector().setInput(target, checkedFeatures).getOutput()
+
+      val workflow = new OpWorkflow().setResultFeatures(prediction).setInputDataset(df)
+      val fittedWorkflow = workflow.train()(spark)
+
+      logger.info(fittedWorkflow.summaryPretty())
+
+      new Model(prediction.name, fittedWorkflow, fittedWorkflow.scoreFunction(spark))
+    }
   }
 
   override def batchPredictBase(sc: SparkContext, bm: Any, qs: RDD[(Long, Map[String, Any])]): RDD[(Long, PredictedResult)] = {
