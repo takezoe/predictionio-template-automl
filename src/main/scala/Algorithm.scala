@@ -21,8 +21,6 @@ import org.apache.spark.sql.types.{DoubleType, IntegerType, StringType, StructFi
 import scala.language.experimental.macros
 import scala.reflect.runtime.universe._
 
-// TODO Implement batch method using Spark
-
 case class AlgorithmParams(target: String, schema: Seq[Field]) extends Params {
   def structType: StructType = {
     StructType(
