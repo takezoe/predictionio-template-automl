@@ -52,10 +52,10 @@ $ pio deploy
 Test the Web API.
 
 ```bash
-$ curl -H "Content-Type: application/json" -d '{ "pClass": "2", "name": "Wheadon, Mr. Edward H", "sex": "male", "age": 66, "sibSp": 0, "parCh": 0, "ticket": "C.A 24579", "fare", 10.5, "cabin": "", "embarked": "S" }' http://localhost:8000/queries.json -s
+$ curl -H "Content-Type: application/json" -d '{ "pClass": "2", "name": "Wheadon, Mr. Edward H", "sex": "male", "age": 66, "sibSp": 0, "parCh": 0, "ticket": "C.A 24579", "fare", 10.5, "cabin": "", "embarked": "S" }' http://localhost:8000/queries.json
 {"survived":0.0}
 
-$ curl -H "Content-Type: application/json" -d '{ "pClass": "2", "name": "Nicola-Yarred, Miss. Jamila", "sex": "female", "age": 14, "sibSp": 1, "parCh": 0, "ticket": "2651", "fare", 11.2417, "cabin": "", "embarked": "C" }' http://localhost:8000/queries.json -s
+$ curl -H "Content-Type: application/json" -d '{ "pClass": "2", "name": "Nicola-Yarred, Miss. Jamila", "sex": "female", "age": 14, "sibSp": 1, "parCh": 0, "ticket": "2651", "fare", 11.2417, "cabin": "", "embarked": "C" }' http://localhost:8000/queries.json
 {"survived":1.0}
 ```
 
