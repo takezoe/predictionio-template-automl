@@ -61,7 +61,7 @@ $ curl -H "Content-Type: application/json" -d '{ "pClass": "2", "name": "Nicola-
 
 ## Customize
 
-You only need to modify algorithm parameters in `engine.json` to customize this template. Note that target field type must be `double` for now.
+You only need to modify algorithm parameters in `engine.json` to customize this template.
 
 ```json
 "algorithms": [
@@ -87,4 +87,4 @@ You only need to modify algorithm parameters in `engine.json` to customize this 
 ]
 ```
 
-Define `schema` according to your data, and specify `target` which will be a response of prediction Web API. Currently, this template supports only binary classification, so the target field must be a binary type.
+Define `schema` according to your data, and specify `target` which will be a response of prediction Web API. Note that the target field type must be `double` for now.
