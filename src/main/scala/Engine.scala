@@ -16,7 +16,7 @@ import org.apache.predictionio.controller.Engine
 //  embarked: Option[String]
 //) extends Serializable
 
-case class PredictedResult(survived: Int) extends Serializable
+case class PredictedResult(survived: Double) extends Serializable
 
 object VanillaEngine extends EngineFactory {
   def apply() = {

@@ -10,9 +10,10 @@ import grizzled.slf4j.Logger
 import com.salesforce.op.features.{Feature, FeatureSparkTypes}
 import com.salesforce.op.features.types._
 import com.salesforce.op.local._
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector}
+import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
 import org.apache.commons.io.FileUtils
 import org.apache.predictionio.data.storage.Event
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StringType, StructField, StructType}
 
@@ -96,7 +97,7 @@ class Algorithm(val params: AlgorithmParams)
 
   @transient lazy val logger = Logger[this.type]
 
-  def train(sc: SparkContext, data: PreparedData): Model = {
+  override def train(sc: SparkContext, data: PreparedData): Model = {
 
     val spark = SparkSession.builder.config(sc.getConf).getOrCreate()
 
@@ -119,13 +120,25 @@ class Algorithm(val params: AlgorithmParams)
     new Model(prediction.name, fittedWorkflow, fittedWorkflow.scoreFunction(spark))
   }
 
-  def predict(model: Model, query: Map[String, Any]): PredictedResult = {
+  override def batchPredictBase(sc: SparkContext, bm: Any, qs: RDD[(Long, Map[String, Any])]): RDD[(Long, PredictedResult)] = {
+    val model = bm.asInstanceOf[Model]
+
+    val spark = SparkSession.builder.config(sc.getConf).getOrCreate()
+    model.model.setInputRDD(qs.map { case (_, query) => query })
+    val result = model.model.score()(spark).rdd
+
+    result.zip(qs).map { case (row, (x, _)) =>
+      (x, PredictedResult(row.get(row.fieldIndex(model.predictionName)).asInstanceOf[Map[String, Any]]("prediction").asInstanceOf[Double]))
+    }
+  }
+
+  override def predict(model: Model, query: Map[String, Any]): PredictedResult = {
     logger.debug("query: " + query)
 
     val result = model.scoreFunction(params.query(query))
     logger.debug("result: " + result)
 
-    PredictedResult(result(model.predictionName).asInstanceOf[Map[String, Any]]("prediction").asInstanceOf[Double].toInt)
+    PredictedResult(result(model.predictionName).asInstanceOf[Map[String, Any]]("prediction").asInstanceOf[Double])
   }
 }
 
