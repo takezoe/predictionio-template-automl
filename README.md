@@ -32,14 +32,12 @@ Run the event server.
 
 ```bash
 $ pio eventserver &
-[INFO] [Management$] Creating Event Server at 0.0.0.0:7070
 ```
 
 Import data to the event server.
 
 ```bash
 $ python ./data/import_titanic.py --file ./data/titanic.csv --access_key $ACCESS_KEY
-890 events are imported.
 ```
 
 Train a model. It can take a long time to find the best model.
