@@ -134,9 +134,9 @@ class Algorithm(val params: AlgorithmParams)
 
     val spark = SparkSession.builder.config(sc.getConf).getOrCreate()
 
-    // TODO Is this thread safe?
-    model.model.setInputRDD(qs.map { case (_, query) => query })
-    val result = model.model.score()(spark).rdd
+    val copiedModel = model.model.copy()
+    copiedModel.setInputRDD(qs.map { case (_, query) => query })
+    val result = copiedModel.score()(spark).rdd
 
     result.zip(qs).map { case (row, (x, _)) =>
       (x, PredictedResult(row.get(row.fieldIndex(model.predictionName)).asInstanceOf[Map[String, Any]]("prediction").asInstanceOf[Double]))
