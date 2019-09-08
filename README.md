@@ -6,8 +6,19 @@ You can launch a prediction WebAPI service without any coding.
 
 ## Prerequisites
 
-- Apache PredictionIO 0.14.0 or higher
-- Apache Spark 2.4.0 or higher
+- Apache PredictionIO 0.14.0
+- Apache Spark 2.3.2
+- Java 1.8
+- TransmogrifAI 0.6.0
+- Scala 2.11.12
+
+- Make sure you compile PredictionIO with the correct scala & spark version (check out [detailed instructions](http://predictionio.apache.org/install/install-sourcecode/)): 
+
+    ```bash
+    $ ./make-distribution.sh -Dscala.version=2.11.12 -Dspark.version=2.3.2
+    ```
+
+__NOTE__: if the compilation fails due to cache problems, you may want to manually remove `~/.ivy2` folder and try again.
 
 ## Run Titanic example
 
@@ -38,6 +49,11 @@ Import data to the event server.
 
 ```bash
 $ python ./data/import_titanic.py --file ./data/titanic.csv --access_key $ACCESS_KEY
+```
+
+Build the app
+```bash
+$ pio build --verbose
 ```
 
 Train a model. It can take a long time to find the best model.
